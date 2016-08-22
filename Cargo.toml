@@ -1,0 +1,10 @@
+[package]
+name = "os_funtimes"
+version = "0.1.0"
+authors = ["Theodore DeRego <tderego94@gmail.com>"]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+rlibc = "0.1.4"
