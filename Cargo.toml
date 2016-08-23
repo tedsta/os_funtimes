@@ -7,6 +7,8 @@ authors = ["Theodore DeRego <tderego94@gmail.com>"]
 crate-type = ["staticlib"]
 
 [dependencies]
+bitflags = "0.7.0"
 rlibc = "0.1.4"
 spin = "0.3.4"
 multiboot2 = { git = "https://github.com/phil-opp/multiboot2-elf64" }
+x86 = { version = "0.7.1", default-features = false }

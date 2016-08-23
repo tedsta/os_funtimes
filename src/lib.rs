@@ -3,15 +3,18 @@
 #![feature(unique)]
 #![no_std]
 
+#[macro_use]
+extern crate bitflags;
 extern crate rlibc;
 extern crate spin;
 extern crate multiboot2;
+extern crate x86;
 
 use memory::FrameAllocator;
 
-mod memory;
 #[macro_use]
 mod vga_buffer;
+mod memory;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_info_addr: usize) {
@@ -48,6 +51,8 @@ pub extern fn rust_main(multiboot_info_addr: usize) {
     let mut frame_allocator =
         memory::AreaFrameAllocator::new(kernel_start as usize, kernel_end as usize, multiboot_start,
                                         multiboot_end, memory_map_tag.memory_areas());
+
+    memory::test_paging(&mut frame_allocator);
 
     for i in 0.. {
         if let None = frame_allocator.allocate_frame() {
