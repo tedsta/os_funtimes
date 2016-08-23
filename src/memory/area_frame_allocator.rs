@@ -49,7 +49,7 @@ impl FrameAllocator for AreaFrameAllocator {
         while let Some(area) = self.current_area {
             // "Clone" the frame to return it if it's free. Frame doesn't
             // implement Clone, but we can construct an identical frame.
-            let frame = Frame{ number: self.next_free_frame.number };
+            let frame = self.next_free_frame.clone();
 
             // the last frame of the current area
             let current_area_last_frame = {
