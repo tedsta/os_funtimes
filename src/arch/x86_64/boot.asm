@@ -5,6 +5,7 @@ section .text
 bits 32
 start:
     mov esp, stack_top
+    mov edi, ebx       ; Move Multiboot info pointer to edi to pass as a parameter to rust_main
 
     call check_multiboot
     call check_cpuid
