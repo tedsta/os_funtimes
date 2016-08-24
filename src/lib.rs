@@ -10,14 +10,17 @@ extern crate spin;
 extern crate multiboot2;
 extern crate x86;
 
-use memory::FrameAllocator;
-
 #[macro_use]
 mod vga_buffer;
 mod memory;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_info_addr: usize) {
+    use memory::FrameAllocator;
+
+    enable_nxe_bit();
+    enable_write_protect_bit();
+
     vga_buffer::clear_screen();
 
     println!("Hello, rust!");
@@ -52,16 +55,28 @@ pub extern fn rust_main(multiboot_info_addr: usize) {
         memory::AreaFrameAllocator::new(kernel_start as usize, kernel_end as usize, multiboot_start,
                                         multiboot_end, memory_map_tag.memory_areas());
 
-    memory::test_paging(&mut frame_allocator);
-
-    for i in 0.. {
-        if let None = frame_allocator.allocate_frame() {
-            println!("allocated {} frames", i);
-            break;
-        }
-    }
+    memory::remap_kernel(&mut frame_allocator, boot_info);
+    frame_allocator.allocate_frame();
+    println!("It did not crash!");
     
     loop { }
+}
+
+fn enable_nxe_bit() {
+    use x86::msr::{IA32_EFER, rdmsr, wrmsr};
+
+    let nxe_bit = 1 << 11;
+    unsafe {
+        let efer = rdmsr(IA32_EFER);
+        wrmsr(IA32_EFER, efer | nxe_bit);
+    }
+}
+
+fn enable_write_protect_bit() {
+    use x86::controlregs::{cr0, cr0_write};
+
+    let wp_bit = 1 << 16;
+    unsafe { cr0_write(cr0() | wp_bit) };
 }
 
 #[lang = "eh_personality"] extern fn eh_personality() { }
