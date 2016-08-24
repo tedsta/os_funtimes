@@ -147,10 +147,9 @@ pub fn remap_kernel<A: FrameAllocator>(allocator: &mut A, boot_info: &BootInform
     let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
 
     let mut active_table = unsafe { ActivePageTable::new() };
-    let mut new_table = {
-        let frame = allocator.allocate_frame().expect("no more frames");
-        InactivePageTable::new(frame, &mut active_table, &mut temporary_page)
-    };
+    let mut new_table =
+        InactivePageTable::new(allocator.allocate_frame().expect("no more frames"),
+                               &mut active_table, &mut temporary_page);
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         let elf_sections_tag = boot_info.elf_sections_tag().expect("Memory map tag required");
