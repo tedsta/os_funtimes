@@ -1,3 +1,4 @@
+#![feature(alloc, collections)]
 #![feature(lang_items)]
 #![feature(const_fn)]
 #![feature(unique)]
@@ -10,14 +11,17 @@ extern crate spin;
 extern crate multiboot2;
 extern crate x86;
 
+extern crate bump_allocator;
+extern crate alloc;
+#[macro_use]
+extern crate collections;
+
 #[macro_use]
 mod vga_buffer;
 mod memory;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_info_addr: usize) {
-    use memory::FrameAllocator;
-
     enable_nxe_bit();
     enable_write_protect_bit();
 
@@ -26,38 +30,15 @@ pub extern fn rust_main(multiboot_info_addr: usize) {
     println!("Hello, rust!");
 
     let boot_info = unsafe { multiboot2::load(multiboot_info_addr) };
-    let memory_map_tag = boot_info.memory_map_tag()
-                                  .expect("Memory map tag required");
+    
+    memory::init(boot_info);
 
-    println!("memory areas:");
-    for area in memory_map_tag.memory_areas() {
-        println!("    start: 0x{:x}, length: 0x{:x}",
-                 area.base_addr, area.length);
-    }
-
-    let elf_sections_tag = boot_info.elf_sections_tag()
-                                    .expect("Elf-sections tag required");
-
-    println!("kernel sections:");
-    for section in elf_sections_tag.sections() {
-        println!("    addr: 0x{:x}, size: 0x{:x}, flags: 0x{:x}",
-                 section.addr, section.size, section.flags);
-    }
-
-    let kernel_start = elf_sections_tag.sections().map(|s| s.addr)
-                                       .min().unwrap();
-    let kernel_end = elf_sections_tag.sections().map(|s| s.addr + s.size)
-                                     .max().unwrap();
-    let multiboot_start = multiboot_info_addr;
-    let multiboot_end = multiboot_start + (boot_info.total_size as usize);
-
-    let mut frame_allocator =
-        memory::AreaFrameAllocator::new(kernel_start as usize, kernel_end as usize, multiboot_start,
-                                        multiboot_end, memory_map_tag.memory_areas());
-
-    memory::remap_kernel(&mut frame_allocator, boot_info);
-    frame_allocator.allocate_frame();
     println!("It did not crash!");
+
+    let v = vec![1u32, 2, 3, 4, 5];
+    for i in v.iter().rev() {
+        println!("{}", i);
+    }
     
     loop { }
 }
