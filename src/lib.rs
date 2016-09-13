@@ -11,7 +11,7 @@ extern crate spin;
 extern crate multiboot2;
 extern crate x86;
 
-extern crate bump_allocator;
+extern crate hole_list_allocator;
 extern crate alloc;
 #[macro_use]
 extern crate collections;
