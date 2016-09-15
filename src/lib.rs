@@ -1,14 +1,14 @@
-#![feature(alloc, collections)]
-#![feature(lang_items)]
-#![feature(const_fn)]
-#![feature(unique)]
+#![feature(alloc, asm, collections, lang_items, const_fn, unique)]
 #![no_std]
 
 #[macro_use]
 extern crate bitflags;
+extern crate bit_field;
+#[macro_use]
+extern crate lazy_static;
+extern crate multiboot2;
 extern crate rlibc;
 extern crate spin;
-extern crate multiboot2;
 extern crate x86;
 
 extern crate hole_list_allocator;
@@ -19,6 +19,7 @@ extern crate collections;
 #[macro_use]
 mod vga_buffer;
 mod memory;
+mod interrupts;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_info_addr: usize) {
@@ -33,6 +34,12 @@ pub extern fn rust_main(multiboot_info_addr: usize) {
     
     memory::init(boot_info);
 
+    // initialize our IDT
+    interrupts::init();
+
+    // provoke a divide-by-zero fault
+    divide_by_zero();
+
     println!("It did not crash!");
 
     let v = vec![1u32, 2, 3, 4, 5];
@@ -41,6 +48,12 @@ pub extern fn rust_main(multiboot_info_addr: usize) {
     }
     
     loop { }
+}
+
+fn divide_by_zero() {
+    unsafe {
+        asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel")
+    }
 }
 
 fn enable_nxe_bit() {

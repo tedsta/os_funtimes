@@ -2,14 +2,21 @@
 name = "os_funtimes"
 version = "0.1.0"
 dependencies = [
+ "bit_field 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bump_allocator 0.1.0",
  "hole_list_allocator 0.1.0",
+ "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "multiboot2 0.1.0 (git+https://github.com/phil-opp/multiboot2-elf64)",
  "rlibc 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "bit_field"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bitflags"
@@ -87,6 +94,7 @@ dependencies = [
 ]
 
 [metadata]
+"checksum bit_field 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8c7f2626c064227bf8d383b35223f8ac9b7d33a7999f7bd9a5b5e491583061f6"
 "checksum bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
 "checksum lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "49247ec2a285bb3dcb23cbd9c35193c025e7251bfce77c1d5da97e6362dffe7f"

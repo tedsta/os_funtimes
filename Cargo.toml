@@ -1,18 +1,32 @@
 [package]
+authors = ["Theodore DeRego <tderego94@gmail.com>"]
 name = "os_funtimes"
 version = "0.1.0"
-authors = ["Theodore DeRego <tderego94@gmail.com>"]
+
+[dependencies]
+bit_field = "0.4.0"
+bitflags = "0.7.0"
+rlibc = "0.1.4"
+spin = "0.3.4"
+
+[dependencies.bump_allocator]
+path = "libs/bump_allocator"
+
+[dependencies.hole_list_allocator]
+path = "libs/hole_list_allocator"
+
+[dependencies.lazy_static]
+version = "0.2.1"
+features = ["spin_no_std"]
+
+[dependencies.multiboot2]
+git = "https://github.com/phil-opp/multiboot2-elf64"
+
+[dependencies.x86]
+default-features = false
+version = "0.7.1"
 
 [lib]
 crate-type = ["staticlib"]
 
 [workspace]
-
-[dependencies]
-bitflags = "0.7.0"
-rlibc = "0.1.4"
-spin = "0.3.4"
-multiboot2 = { git = "https://github.com/phil-opp/multiboot2-elf64" }
-x86 = { version = "0.7.1", default-features = false }
-bump_allocator = { path = "libs/bump_allocator" }
-hole_list_allocator = { path = "libs/hole_list_allocator" }
