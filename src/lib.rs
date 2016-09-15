@@ -1,4 +1,4 @@
-#![feature(alloc, asm, collections, lang_items, const_fn, unique)]
+#![feature(alloc, asm, collections, lang_items, const_fn, unique, naked_functions, core_intrinsics)]
 #![no_std]
 
 #[macro_use]
@@ -38,7 +38,11 @@ pub extern fn rust_main(multiboot_info_addr: usize) {
     interrupts::init();
 
     // provoke a divide-by-zero fault
-    divide_by_zero();
+    //divide_by_zero();
+
+    //unsafe { asm!("ud2" :::: "intel"); }
+
+    unsafe { let u: u32 = *(0x20000000 as *const u32); }
 
     println!("It did not crash!");
 
