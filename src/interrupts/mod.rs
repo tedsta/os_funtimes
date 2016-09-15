@@ -1,3 +1,5 @@
+use vga_buffer::print_error;
+
 mod idt;
 
 lazy_static! {
@@ -11,7 +13,7 @@ lazy_static! {
 }
 
 extern "C" fn divide_by_zero_handler() -> ! {
-    println!("EXCEPTION: DIVIDE BY ZERO");
+    unsafe { print_error(format_args!("EXCEPTION: DIVIDE BY ZERO")); }
     loop {}
 }
 
