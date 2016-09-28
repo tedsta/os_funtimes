@@ -79,13 +79,14 @@ pub fn init(boot_info: &BootInformation) {
              boot_info.start_address(),
              boot_info.end_address());
 
-    let mut frame_allocator = AreaFrameAllocator::new(
-        kernel_start as usize, kernel_end as usize,
-        boot_info.start_address(), boot_info.end_address(),
-        memory_map_tag.memory_areas());
+    let mut frame_allocator = AreaFrameAllocator::new(kernel_start as usize, kernel_end as usize,
+                                                      boot_info.start_address(),
+                                                      boot_info.end_address(),
+                                                      memory_map_tag.memory_areas());
 
     let mut active_table = paging::remap_kernel(&mut frame_allocator, boot_info);
 
+    // Memory map the kernel heap
     use self::paging::Page;
     use hole_list_allocator::{HEAP_START, HEAP_SIZE};
 
