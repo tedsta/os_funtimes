@@ -9,6 +9,7 @@ extern crate lazy_static;
 extern crate multiboot2;
 extern crate rlibc;
 extern crate spin;
+#[macro_use]
 extern crate x86;
 
 extern crate hole_list_allocator;
@@ -42,7 +43,10 @@ pub extern fn rust_main(multiboot_info_addr: usize) {
 
     //unsafe { asm!("ud2" :::: "intel"); }
 
-    unsafe { let u: u32 = *(0x20000000 as *const u32); }
+    // trigger a breakpoint exception
+    unsafe { int!(3) };
+
+    //unsafe { let u: u32 = *(0x20000000 as *const u32); }
 
     println!("It did not crash!");
 
