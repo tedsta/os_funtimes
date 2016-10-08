@@ -1,6 +1,6 @@
 arch ?= x86_64
 kernel := build/kernel-$(arch).bin
-target ?= $(arch)-unknown-linux-gnu
+target ?= $(arch)-blog_os
 rust_os := target/$(target)/debug/libos_funtimes.a
 iso := build/os-$(arch).iso
 
@@ -39,7 +39,7 @@ $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
 	@ld --gc-sections -n -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 cargo:
-	@cargo build --target $(target)
+	@xargo build --target $(target)
 
 # compile assembly files
 build/arch/$(arch)/%.o: src/arch/$(arch)/%.asm
