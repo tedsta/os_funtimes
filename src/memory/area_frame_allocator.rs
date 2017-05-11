@@ -1,5 +1,6 @@
-use memory::{Frame, FrameAllocator};
 use multiboot2::{MemoryAreaIter, MemoryArea};
+
+use ::memory::{Frame, FrameAllocator};
 
 pub struct AreaFrameAllocator {
     next_free_frame: Frame,
@@ -31,12 +32,12 @@ impl AreaFrameAllocator {
 
     fn choose_next_area(&mut self) {
         self.current_area = self.areas.clone().filter(|area| {
-            let address = area.base_addr + area.length - 1;
-            Frame::containing_address(address as usize) >= self.next_free_frame
-        }).min_by_key(|area| area.base_addr);
+            let address = area.start_address() + area.size() - 1;
+            Frame::containing_address(address) >= self.next_free_frame
+        }).min_by_key(|area| area.start_address());
 
         if let Some(area) = self.current_area {
-            let start_frame = Frame::containing_address(area.base_addr as usize);
+            let start_frame = Frame::containing_address(area.start_address());
             if self.next_free_frame < start_frame {
                 self.next_free_frame = start_frame;
             }
@@ -53,8 +54,8 @@ impl FrameAllocator for AreaFrameAllocator {
 
             // the last frame of the current area
             let current_area_last_frame = {
-                let address = area.base_addr + area.length - 1;
-                Frame::containing_address(address as usize)
+                let address = area.start_address() + area.size() - 1;
+                Frame::containing_address(address)
             };
 
             if frame > current_area_last_frame {

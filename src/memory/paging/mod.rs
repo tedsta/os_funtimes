@@ -1,4 +1,4 @@
-use core::ops::{Deref, DerefMut};
+use core::ops::{Add, Deref, DerefMut};
 
 use multiboot2::BootInformation;
 
@@ -16,8 +16,8 @@ mod temporary_page;
 
 const ENTRY_COUNT: usize = 512;
 
-pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
+pub type PhysicalAddress = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
@@ -31,7 +31,7 @@ impl Page {
         Page { number: address / PAGE_SIZE }
     }
 
-    fn start_address(&self) -> usize {
+    pub fn start_address(&self) -> usize {
         self.number * PAGE_SIZE
     }
 
@@ -56,6 +56,15 @@ impl Page {
     }
 }
 
+impl Add<usize> for Page {
+    type Output = Page;
+
+    fn add(self, rhs: usize) -> Page {
+        Page { number: self.number + rhs }
+    }
+}
+
+#[derive(Clone)]
 pub struct PageIter {
     start: Page,
     end: Page,
@@ -68,6 +77,16 @@ impl Iterator for PageIter {
         if self.start <= self.end {
             let page = self.start;
             self.start.number += 1;
+            Some(page)
+        } else {
+            None
+        }
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Page> {
+        if self.start + n <= self.end {
+            let page = self.start + n;
+            self.start.number += page.number + 1;
             Some(page)
         } else {
             None
@@ -106,12 +125,13 @@ impl ActivePageTable {
                    f: F)
         where F: FnOnce(&mut Mapper)
     {
-        use x86::{controlregs, tlb};
+        use x86_64::instructions::tlb;
+        use x86_64::registers::control_regs;
 
-        let flush_tlb = || unsafe { tlb::flush_all() };
+        let flush_tlb = || tlb::flush_all();
 
         {
-            let backup = Frame::containing_address(unsafe { controlregs::cr3() } as usize);
+            let backup = Frame::containing_address(control_regs::cr3().0 as usize);
 
             // map temporary_page to current p4 table
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
@@ -132,15 +152,14 @@ impl ActivePageTable {
     }
 
     pub fn switch(&mut self, new_table: InactivePageTable) -> InactivePageTable {
-        use x86::controlregs;
+        use x86_64;
+        use x86_64::registers::control_regs;
 
         let old_table = InactivePageTable {
-            p4_frame: Frame::containing_address(
-                unsafe { controlregs::cr3() } as usize
-            ),
+            p4_frame: Frame::containing_address(control_regs::cr3().0 as usize),
         };
         unsafe {
-            controlregs::cr3_write(new_table.p4_frame.start_address() as u64);
+            control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_frame.start_address() as u64));
         }
         old_table
     }
@@ -186,10 +205,11 @@ pub fn remap_kernel<A: FrameAllocator>(allocator: &mut A, boot_info: &BootInform
                 // section is not loaded to memory
                 continue;
             }
-            assert!(section.addr as usize % PAGE_SIZE == 0, "sections need to be page aligned");
+            assert!(section.start_address() % PAGE_SIZE == 0,
+                    "sections need to be page aligned");
 
             println!("mapping section at addr: {:#x}, size: {:#x}",
-                section.addr, section.size);
+                section.start_address(), section.size());
 
             let flags = EntryFlags::from_elf_section_flags(section);
 

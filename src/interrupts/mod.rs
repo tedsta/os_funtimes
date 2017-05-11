@@ -1,150 +1,102 @@
-use vga_buffer::print_error;
+use spin::Once;
+use x86_64::structures::idt::{ExceptionStackFrame, Idt, PageFaultErrorCode};
+use x86_64::structures::tss::TaskStateSegment;
 
-mod idt;
+use memory::MemoryController;
 
-extern "C" fn divide_by_zero_handler(stack_frame: *const ExceptionStackFrame) {
+mod gdt;
+
+const DOUBLE_FAULT_IST_INDEX: usize = 0;
+
+lazy_static! {
+    static ref IDT: Idt = {
+        let mut idt = Idt::new();
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
+        idt.invalid_tss.set_handler_fn(invalid_tss_handler);
+        idt.page_fault.set_handler_fn(page_fault_handler);
+        unsafe {
+            idt.double_fault.set_handler_fn(double_fault_handler)
+               .set_stack_index(DOUBLE_FAULT_IST_INDEX as u16);
+        }
+        // Interrupt 0x80 is syscall
+        idt.interrupts[0x80 - 32].set_handler_fn(syscall_handler);
+        idt
+    };
+}
+
+static TSS: Once<TaskStateSegment> = Once::new();
+static GDT: Once<gdt::Gdt> = Once::new();
+
+pub fn init(memory_controller: &mut MemoryController) {
+    use x86_64::structures::gdt::SegmentSelector;
+    use x86_64::instructions::segmentation::set_cs;
+    use x86_64::instructions::tables::load_tss;
+    use x86_64::VirtualAddress;
+
+    let double_fault_stack = memory_controller.alloc_stack(1)
+        .expect("could not allocate double fault stack");
+
+    let tss = TSS.call_once(|| {
+        let mut tss = TaskStateSegment::new();
+        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] =
+            VirtualAddress(double_fault_stack.top());
+        tss
+    });
+
+    let mut code_selector = SegmentSelector(0);
+    let mut tss_selector = SegmentSelector(0);
+    let gdt = GDT.call_once(|| {
+        let mut gdt = gdt::Gdt::new();
+        code_selector = gdt.add_entry(gdt::Descriptor::kernel_code_segment());
+        tss_selector = gdt.add_entry(gdt::Descriptor::tss_segment(&tss));
+        gdt
+    });
+    gdt.load();
+
     unsafe {
-        print_error(format_args!("EXCEPTION: DIVIDE BY ZERO\n{:#?}",
-            *stack_frame));
+        // reload code segment register
+        set_cs(code_selector);
+        // load TSS
+        load_tss(tss_selector);
     }
-}
 
-extern "C" fn invalid_opcode_handler(stack_frame: *const ExceptionStackFrame) {
-    unsafe {
-        print_error(format_args!("EXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
-            (*stack_frame).instruction_pointer, *stack_frame));
-    }
-}
-
-extern "C" fn breakpoint_handler(stack_frame: *const ExceptionStackFrame) {
-    unsafe {
-        print_error(format_args!("EXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
-                                 (*stack_frame).instruction_pointer,
-                                 *stack_frame));
-    }
-}
-
-bitflags! {
-    flags PageFaultErrorCode: u64 {
-        const PROTECTION_VIOLATION = 1 << 0,
-        const CAUSED_BY_WRITE = 1 << 1,
-        const USER_MODE = 1 << 2,
-        const MALFORMED_TABLE = 1 << 3,
-        const INSTRUCTION_FETCH = 1 << 4,
-    }
-}
-
-extern "C" fn page_fault_handler(stack_frame: *const ExceptionStackFrame, error_code: u64) -> ! {
-    use x86::controlregs;
-    unsafe {
-        print_error(format_args!(
-            "EXCEPTION: PAGE FAULT while accessing {:#x}\
-            \nerror code: {:?}\n{:#?}",
-            controlregs::cr2(),
-            PageFaultErrorCode::from_bits(error_code).unwrap(),
-            *stack_frame));
-    }
-    loop {}
-}
-
-#[derive(Debug)]
-#[repr(C)]
-struct ExceptionStackFrame {
-    instruction_pointer: u64,
-    code_segment: u64,
-    cpu_flags: u64,
-    stack_pointer: u64,
-    stack_segment: u64,
-}
-
-pub fn init() {
     IDT.load();
 }
 
-macro_rules! save_scratch_registers {
-    () => {
-        asm!("push rax
-              push rcx
-              push rdx
-              push rsi
-              push rdi
-              push r8
-              push r9
-              push r10
-              push r11
-        " :::: "intel", "volatile");
-    }
+extern "x86-interrupt"
+fn syscall_handler(_: &mut ExceptionStackFrame) {
+    println!("SYSCALL");
 }
 
-macro_rules! restore_scratch_registers {
-    () => {
-        asm!("pop r11
-              pop r10
-              pop r9
-              pop r8
-              pop rdi
-              pop rsi
-              pop rdx
-              pop rcx
-              pop rax
-            " :::: "intel", "volatile");
-    }
+extern "x86-interrupt"
+fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
+    println!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
 }
 
-macro_rules! handler {
-    ($name: ident) => {{
-        #[naked]
-        extern "C" fn wrapper() -> ! {
-            unsafe {
-                save_scratch_registers!();
-                asm!("mov rdi, rsp
-                      add rdi, 9*8 // calculate exception stack frame pointer
-                      // sub rsp, 8 (stack is aligned already)
-                      call $0"
-                      :: "i"($name as
-                             extern "C" fn(*const ExceptionStackFrame))
-                      : "rdi" : "intel", "volatile");
-
-                restore_scratch_registers!();
-                asm!("
-                      // add rsp, 8 (undo stack alignment; not needed anymore)
-                      iretq"
-                      :::: "intel", "volatile");
-                ::core::intrinsics::unreachable();
-            }
-        }
-        wrapper
-    }}
+extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
+    println!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
+             stack_frame.instruction_pointer,
+             stack_frame);
+    loop {}
 }
 
-macro_rules! handler_with_error_code {
-    ($name: ident) => {{
-        #[naked]
-        extern "C" fn wrapper() -> ! {
-            unsafe {
-                asm!("pop rsi // pop error code into rsi
-                      mov rdi, rsp
-                      sub rsp, 8 // align the stack pointer
-                      call $0"
-                      :: "i"($name as extern "C" fn(
-                          *const ExceptionStackFrame, u64) -> !)
-                      : "rdi","rsi" : "intel");
-                ::core::intrinsics::unreachable();
-            }
-        }
-        wrapper
-    }}
+extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
+    println!("\nEXCEPTION: INVALID TSS\nerror_code: {}\n{:#?}",
+             error_code,
+             stack_frame);
+    loop {}
 }
 
-lazy_static! {
-    static ref IDT: idt::Idt = {
-        let mut idt = idt::Idt::new();
+extern "x86-interrupt"
+fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
+    println!("EXCEPTION: PAGE FAULT\nerror code: {:?}\n{:#?}", error_code, stack_frame);
+    loop {}
+}
 
-        idt.set_handler(0, handler!(divide_by_zero_handler));
-        idt.set_handler(3, handler!(breakpoint_handler));
-        idt.set_handler(6, handler!(invalid_opcode_handler));
-        idt.set_handler(14, handler_with_error_code!(page_fault_handler));
-
-        idt
-    };
+extern "x86-interrupt"
+fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
+    println!("EXCEPTION: DOUBLE FAULT:\nerror code: {}\n{:#?}", error_code, stack_frame);
+    loop {}
 }

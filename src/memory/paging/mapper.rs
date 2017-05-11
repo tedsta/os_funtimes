@@ -1,8 +1,9 @@
-use super::{VirtualAddress, PhysicalAddress, Page, ENTRY_COUNT};
+use core::ptr::Unique;
+
+use super::{Page, ENTRY_COUNT, VirtualAddress, PhysicalAddress};
 use super::entry::*;
 use super::table::{self, Table, Level4};
 use memory::{PAGE_SIZE, Frame, FrameAllocator};
-use core::ptr::Unique;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -98,6 +99,9 @@ impl Mapper {
     pub fn unmap<A>(&mut self, page: Page, allocator: &mut A)
         where A: FrameAllocator
     {
+        use x86_64;
+        use x86_64::instructions::tlb;
+
         assert!(self.translate(page.start_address()).is_some());
 
         let p1 = self.p4_mut()
@@ -107,7 +111,7 @@ impl Mapper {
                      .expect("mapping code does not support huge pages");
         let frame = p1[page.p1_index()].pointed_frame().unwrap();
         p1[page.p1_index()].set_unused();
-        unsafe { ::x86::tlb::flush(page.start_address()); }
+        tlb::flush(x86_64::VirtualAddress(page.start_address()));
         // TODO free p(1,2,3) table if empty
         allocator.deallocate_frame(frame);
     }
