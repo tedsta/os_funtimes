@@ -1,4 +1,4 @@
-use core::ops::{Add, Deref, DerefMut};
+use core::ops::{Add, Deref, DerefMut, Sub};
 
 use multiboot2::BootInformation;
 
@@ -64,10 +64,24 @@ impl Add<usize> for Page {
     }
 }
 
+impl Sub<usize> for Page {
+    type Output = Page;
+
+    fn sub(self, rhs: usize) -> Page {
+        Page { number: self.number - rhs }
+    }
+}
+
 #[derive(Clone)]
 pub struct PageIter {
     start: Page,
     end: Page,
+}
+
+impl PageIter {
+    pub fn size(&self) -> usize {
+        self.end.number - self.start.number + 1
+    }
 }
 
 impl Iterator for PageIter {
@@ -86,7 +100,7 @@ impl Iterator for PageIter {
     fn nth(&mut self, n: usize) -> Option<Page> {
         if self.start + n <= self.end {
             let page = self.start + n;
-            self.start.number += page.number + 1;
+            self.start.number += n + 1;
             Some(page)
         } else {
             None
@@ -119,11 +133,12 @@ impl ActivePageTable {
         }
     }
 
-    pub fn with<F>(&mut self,
+    pub fn with<A, F>(&mut self,
                    table: &mut InactivePageTable,
                    temporary_page: &mut temporary_page::TemporaryPage,
+                   allocator: &mut A,
                    f: F)
-        where F: FnOnce(&mut Mapper)
+        where A: FrameAllocator, F: FnOnce(&mut Mapper, &mut A)
     {
         use x86_64::instructions::tlb;
         use x86_64::registers::control_regs;
@@ -134,21 +149,21 @@ impl ActivePageTable {
             let backup = Frame::containing_address(control_regs::cr3().0 as usize);
 
             // map temporary_page to current p4 table
-            let p4_table = temporary_page.map_table_frame(backup.clone(), self);
+            let p4_table = temporary_page.map_table_frame(backup.clone(), self, allocator);
 
             // overwrite recursive mapping
             self.p4_mut()[511].set(table.p4_frame.clone(), PRESENT | WRITABLE);
             flush_tlb();
 
             // execute f in the new context
-            f(self);
+            f(self, allocator);
 
             // restore recursive mapping to original p4 table
             p4_table[511].set(backup, PRESENT | WRITABLE);
             flush_tlb();
         }
         
-        temporary_page.unmap(self);
+        temporary_page.unmap(self, allocator);
     }
 
     pub fn switch(&mut self, new_table: InactivePageTable) -> InactivePageTable {
@@ -170,34 +185,37 @@ pub struct InactivePageTable {
 }
 
 impl InactivePageTable {
-    pub fn new(frame: Frame,
-               active_table: &mut ActivePageTable,
-               temporary_page: &mut TemporaryPage)
-               -> InactivePageTable
+    pub fn new<A: FrameAllocator>(frame: Frame,
+                                  active_table: &mut ActivePageTable,
+                                  temporary_page: &mut TemporaryPage,
+                                  allocator: &mut A)
+                                  -> InactivePageTable
     {
         {
-            let table = temporary_page.map_table_frame(frame.clone(),
-                active_table);
+            let table =
+                temporary_page.map_table_frame(frame.clone(), active_table, allocator);
             // now we are able to zero the table
             table.zero();
             // set up recursive mapping for the table
             table[511].set(frame.clone(), PRESENT | WRITABLE);
         }
-        temporary_page.unmap(active_table);
+        temporary_page.unmap(active_table, allocator);
 
         InactivePageTable { p4_frame: frame }
     }
 }
 
-pub fn remap_kernel<A: FrameAllocator>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable {
-    let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
+pub fn remap_kernel<A: FrameAllocator>(allocator: &mut A, boot_info: &BootInformation)
+                                       -> ActivePageTable
+{
+    let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe });
 
     let mut active_table = unsafe { ActivePageTable::new() };
     let mut new_table =
         InactivePageTable::new(allocator.allocate_frame().expect("no more frames"),
-                               &mut active_table, &mut temporary_page);
+                               &mut active_table, &mut temporary_page, allocator);
 
-    active_table.with(&mut new_table, &mut temporary_page, |mapper| {
+    active_table.with(&mut new_table, &mut temporary_page, allocator, |mapper, allocator| {
         let elf_sections_tag = boot_info.elf_sections_tag().expect("Memory map tag required");
 
         for section in elf_sections_tag.sections() {

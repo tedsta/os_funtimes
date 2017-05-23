@@ -1,6 +1,6 @@
 use core::ptr::Unique;
 
-use super::{Page, ENTRY_COUNT, VirtualAddress, PhysicalAddress};
+use super::{Page, PageIter, ENTRY_COUNT, VirtualAddress, PhysicalAddress};
 use super::entry::*;
 use super::table::{self, Table, Level4};
 use memory::{PAGE_SIZE, Frame, FrameAllocator};
@@ -84,6 +84,15 @@ impl Mapper {
     {
         let frame = allocator.allocate_frame().expect("out of memory");
         self.map_to(page, frame, flags, allocator)
+    }
+
+    pub fn map_range<A>(&mut self, pages: PageIter, flags: EntryFlags, allocator: &mut A)
+        where A: FrameAllocator
+    {
+        let frames = allocator.allocate_frames(pages.size()).expect("out of memory");
+        for (page, frame) in pages.zip(frames) {
+            self.map_to(page, frame, flags, allocator)
+        }
     }
 
     pub fn identity_map<A>(&mut self,

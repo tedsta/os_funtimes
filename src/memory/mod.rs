@@ -7,7 +7,7 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::stack_allocator::Stack;
 
 mod area_frame_allocator;
-mod paging;
+pub mod paging;
 mod stack_allocator;
 
 pub const PAGE_SIZE: usize = 4096;
@@ -82,8 +82,13 @@ pub struct MemoryController {
 }
 
 impl MemoryController {
-    /*pub fn alloc_frame(&mut self, size_in_pages: usize) -> Option<FrameRange> {
+    /*pub fn map_range(&mut self, pages: PageIter, flags: paging::EntryFlags, frames: FrameIter) {
+        self.active_table.map_range(pages, flags, frames);
     }*/
+
+    pub fn alloc_frames(&mut self, size_in_pages: usize) -> Option<FrameIter> {
+        self.frame_allocator.allocate_frames(size_in_pages)
+    }
 
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
         self.stack_allocator.alloc_stack(&mut self.active_table, &mut self.frame_allocator,
@@ -117,6 +122,7 @@ impl Frame {
     }
 }
 
+#[derive(PartialEq)]
 struct FrameIter {
     start: Frame,
     end: Frame,
@@ -137,6 +143,17 @@ impl Iterator for FrameIter {
 }
 
 pub trait FrameAllocator {
-    fn allocate_frame(&mut self) -> Option<Frame>;
-    fn deallocate_frame(&mut self, frame: Frame);
+    fn allocate_frames(&mut self, count: usize) -> Option<FrameIter>;
+    fn deallocate_frames(&mut self, frames: FrameIter);
+
+    fn allocate_frame(&mut self) -> Option<Frame> {
+        self.allocate_frames(1).map(|frames| {
+            assert!(frames.start == frames.end);
+            frames.start
+        })
+    }
+
+    fn deallocate_frame(&mut self, frame: Frame) {
+        self.deallocate_frames(Frame::range_inclusive(frame.clone(), frame));
+    }
 }

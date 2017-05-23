@@ -1,6 +1,6 @@
 use multiboot2::{MemoryAreaIter, MemoryArea};
 
-use ::memory::{Frame, FrameAllocator};
+use ::memory::{Frame, FrameAllocator, FrameIter};
 
 pub struct AreaFrameAllocator {
     next_free_frame: Frame,
@@ -46,7 +46,49 @@ impl AreaFrameAllocator {
 }
 
 impl FrameAllocator for AreaFrameAllocator {
-    fn allocate_frame(&mut self) -> Option<Frame> {
+    fn allocate_frames(&mut self, count: usize) -> Option<FrameIter> {
+        if count > 0 {
+            while let Some(area) = self.current_area {
+                // "Clone" the frame to return it if it's free. Frame doesn't
+                // implement Clone, but we can construct an identical frame.
+                let start = self.next_free_frame.clone();
+                let end = Frame { number: start.number + count - 1 };
+
+                // the last frame of the current area
+                let current_area_last_frame = {
+                    let address = area.start_address() + area.size() - 1;
+                    Frame::containing_address(address)
+                };
+
+                if start > current_area_last_frame {
+                    // all frames of current area are used, switch to next area
+                    self.choose_next_area();
+                } else if start <= self.kernel_end && end >= self.kernel_start {
+                    // `frame` is used by the kernel
+                    self.next_free_frame = Frame {
+                        number: self.kernel_end.number + 1
+                    };
+                } else if start <= self.multiboot_end && end >= self.multiboot_start {
+                    // `frame` is used by the multiboot information structure
+                    self.next_free_frame = Frame {
+                        number: self.multiboot_end.number + 1
+                    };
+                } else {
+                    // frame is unused, increment `next_free_frame` and return it
+                    self.next_free_frame.number += count;
+                    return Some(Frame::range_inclusive(start, end));
+                }
+                // `frame` was not valid, try it again with the updated `next_free_frame`
+            }
+        }
+
+        None
+    }
+
+    fn deallocate_frames(&mut self, frames: FrameIter) {
+    }
+
+    /*fn allocate_frame(&mut self) -> Option<Frame> {
         while let Some(area) = self.current_area {
             // "Clone" the frame to return it if it's free. Frame doesn't
             // implement Clone, but we can construct an identical frame.
@@ -80,9 +122,5 @@ impl FrameAllocator for AreaFrameAllocator {
         }
 
         None
-    }
-
-    fn deallocate_frame(&mut self, frame: Frame) {
-        //unimplemented!();
-    }
+    }*/
 }
