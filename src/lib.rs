@@ -1,4 +1,4 @@
-#![feature(abi_x86_interrupt, alloc, asm, collections, lang_items, const_fn, unique)]
+#![feature(abi_x86_interrupt, alloc, asm, collections, core_intrinsics, lang_items, const_fn, unique)]
 #![no_std]
 
 #[macro_use]
@@ -17,10 +17,16 @@ extern crate alloc;
 #[macro_use]
 extern crate collections;
 
+use collections::BTreeMap;
+
+// Declare before other modules so that they can use println! macro
 #[macro_use]
-mod vga_buffer;
+pub mod vga_buffer;
+
+mod drivers;
 mod memory;
 mod interrupts;
+mod syscall;
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_info_addr: usize) {
@@ -50,6 +56,10 @@ pub extern "C" fn rust_main(multiboot_info_addr: usize) {
     unsafe { int!(0x80); }
 
     println!("It did not crash!");
+
+    let mut pci_device_drivers = BTreeMap::new();
+    pci_device_drivers.insert((1, 6, 32902, 10530), drivers::ahci::init as drivers::pci::PciDeviceDriver);
+    drivers::pci::init_devices(&pci_device_drivers);
 
     let v = vec![1u32, 2, 3, 4, 5];
     for i in v.iter().rev() {

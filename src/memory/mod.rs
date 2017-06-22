@@ -1,13 +1,17 @@
 use multiboot2::BootInformation;
 use spin;
 
-use self::paging::PhysicalAddress;
+use self::area_frame_allocator::AreaFrameAllocator;
+use self::grant_allocator::GrantAllocator;
+use self::stack_allocator::StackAllocator;
 
-pub use self::area_frame_allocator::AreaFrameAllocator;
+pub use self::grant_allocator::Grant;
+pub use self::paging::{PhysicalAddress, VirtualAddress, EntryFlags, WRITABLE};
 pub use self::stack_allocator::Stack;
 
 mod area_frame_allocator;
-pub mod paging;
+mod grant_allocator;
+mod paging;
 mod stack_allocator;
 
 pub const PAGE_SIZE: usize = 4096;
@@ -61,33 +65,40 @@ pub fn init(boot_info: &BootInformation) {
     }
 
     // Create a stack allocator
-    let stack_allocator = {
-        let stack_alloc_start = heap_end_page + 1;
-        let stack_alloc_end = stack_alloc_start + 100;
-        let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
-        stack_allocator::StackAllocator::new(stack_alloc_range)
-    };
+    let stack_alloc_start = heap_end_page + 1;
+    let stack_alloc_end = stack_alloc_start + 100;
+    let stack_allocator =
+        StackAllocator::new(Page::range_inclusive(stack_alloc_start, stack_alloc_end));
+
+    let grant_alloc_start = stack_alloc_end + 1;
+    let grant_alloc_end = grant_alloc_start + 100;
+    let grant_allocator =
+        GrantAllocator::new(Page::range_inclusive(grant_alloc_start, grant_alloc_end));
 
     *MEM_CONTROLLER.lock() = Some(MemoryController {
         active_table: active_table,
         frame_allocator: frame_allocator,
         stack_allocator: stack_allocator,
+        grant_allocator: grant_allocator,
     });
 }
 
 pub struct MemoryController {
     active_table: paging::ActivePageTable,
     frame_allocator: AreaFrameAllocator,
-    stack_allocator: stack_allocator::StackAllocator,
+    stack_allocator: StackAllocator,
+    grant_allocator: GrantAllocator,
 }
 
 impl MemoryController {
-    /*pub fn map_range(&mut self, pages: PageIter, flags: paging::EntryFlags, frames: FrameIter) {
-        self.active_table.map_range(pages, flags, frames);
-    }*/
+    pub fn translate_address(&mut self, address: VirtualAddress) -> Option<PhysicalAddress> {
+        self.active_table.translate(address)
+    }
 
-    pub fn alloc_frames(&mut self, size_in_pages: usize) -> Option<FrameIter> {
-        self.frame_allocator.allocate_frames(size_in_pages)
+    pub fn alloc_grant(&mut self, size: usize, flags: paging::EntryFlags) -> Option<Grant> {
+        self.grant_allocator.allocate(&mut self.active_table,
+                                      &mut self.frame_allocator,
+                                      (size + 4095) / PAGE_SIZE, flags)
     }
 
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {

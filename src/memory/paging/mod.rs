@@ -3,11 +3,10 @@ use core::ops::{Add, Deref, DerefMut, Sub};
 use multiboot2::BootInformation;
 
 use super::{PAGE_SIZE, Frame, FrameAllocator};
-use self::entry::EntryFlags;
 use self::temporary_page::TemporaryPage;
 
 pub use self::mapper::Mapper;
-pub use self::entry::{PRESENT, WRITABLE};
+pub use self::entry::{EntryFlags, PRESENT, WRITABLE};
 
 mod entry;
 mod mapper;

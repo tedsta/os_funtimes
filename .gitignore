@@ -1,4 +1,5 @@
 build/
+data/
 target/
 rust-os-gdb/
 *.swp

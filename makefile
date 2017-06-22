@@ -18,7 +18,7 @@ clean:
 	@rm -r build
 
 run: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso)
+	@qemu-system-x86_64 -boot d -cdrom $(iso) -drive id=disk0,format=raw,media=disk,file=data/disk_test.img,if=none -device ahci,id=ahci -device ide-drive,drive=disk0,bus=ahci.0
 
 debug: $(iso)
 	@qemu-system-x86_64 -s -S -cdrom $(iso)

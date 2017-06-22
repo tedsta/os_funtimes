@@ -124,4 +124,12 @@ impl Mapper {
         // TODO free p(1,2,3) table if empty
         allocator.deallocate_frame(frame);
     }
+
+    pub fn unmap_range<A>(&mut self, pages: PageIter, allocator: &mut A)
+        where A: FrameAllocator
+    {
+        for page in pages {
+            self.unmap(page, allocator);
+        }
+    }
 }
