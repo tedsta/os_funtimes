@@ -15,7 +15,7 @@ pub struct DmaAllocator {
 impl DmaAllocator {
     /// Create a DmaAllocator contiguous chunk of unmapped virtual memory
     pub fn new(size: usize) -> DmaAllocator {
-        let start = syscall::alloc_grant(size, WRITABLE).unwrap();
+        let start = syscall::alloc_vm(size, WRITABLE).unwrap();
         let start_phys =
             with_mem_ctrl(|m| {
                 m.translate_address(start).unwrap()
@@ -32,6 +32,7 @@ impl DmaAllocator {
         let addr_virt = self.start + self.next_free_byte.get();
         let addr_phys = self.start_phys + self.next_free_byte.get();
         self.next_free_byte.set(self.next_free_byte.get() + mem::size_of::<T>());
+        println!("next free byte {} size {}", self.next_free_byte.get(), self.size);
         if self.next_free_byte.get() < self.size {
             Ok(Dma::new(addr_virt, addr_phys, value))
         } else {
@@ -43,6 +44,7 @@ impl DmaAllocator {
         let addr_virt = self.start + self.next_free_byte.get();
         let addr_phys = self.start_phys + self.next_free_byte.get();
         self.next_free_byte.set(self.next_free_byte.get() + mem::size_of::<T>());
+        println!("next free byte {} size {}", self.next_free_byte.get(), self.size);
         if self.next_free_byte.get() < self.size {
             Ok(Dma::zeroed(addr_virt, addr_phys))
         } else {
@@ -53,7 +55,7 @@ impl DmaAllocator {
 
 impl Drop for DmaAllocator {
     fn drop(&mut self) {
-        let _ = unsafe { syscall::free_grant(self.start) };
+        let _ = unsafe { syscall::free_vm(self.start) };
     }
 }
 
@@ -101,6 +103,6 @@ impl<'a, T> DerefMut for Dma<'a, T> {
 
 impl<'a, T> Drop for Dma<'a, T> {
     fn drop(&mut self) {
-        unsafe { drop(ptr::read(self.virt)); }
+        //unsafe { drop(ptr::read(self.virt)); }
     }
 }

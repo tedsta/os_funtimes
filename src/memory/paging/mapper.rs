@@ -3,7 +3,7 @@ use core::ptr::Unique;
 use super::{Page, PageIter, ENTRY_COUNT, VirtualAddress, PhysicalAddress};
 use super::entry::*;
 use super::table::{self, Table, Level4};
-use memory::{PAGE_SIZE, Frame, FrameAllocator};
+use ::memory::{PAGE_SIZE, Frame, FrameAllocator, FrameIter};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -90,6 +90,14 @@ impl Mapper {
         where A: FrameAllocator
     {
         let frames = allocator.allocate_frames(pages.size()).expect("out of memory");
+        for (page, frame) in pages.zip(frames) {
+            self.map_to(page, frame, flags, allocator)
+        }
+    }
+
+    pub fn map_range_to<A>(&mut self, pages: PageIter, frames: FrameIter, flags: EntryFlags, allocator: &mut A)
+        where A: FrameAllocator
+    {
         for (page, frame) in pages.zip(frames) {
             self.map_to(page, frame, flags, allocator)
         }

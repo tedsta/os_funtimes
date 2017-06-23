@@ -78,6 +78,10 @@ pub struct PageIter {
 }
 
 impl PageIter {
+    pub fn start_address(&self) -> VirtualAddress {
+        self.start.start_address()
+    }
+
     pub fn size(&self) -> usize {
         self.end.number - self.start.number + 1
     }
