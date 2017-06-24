@@ -29,11 +29,11 @@ impl DmaAllocator {
     }
 
     pub fn allocate<'a, T>(&'a self, value: T) -> Result<Dma<'a, T>> {
-        let addr_virt = self.start + self.next_free_byte.get();
-        let addr_phys = self.start_phys + self.next_free_byte.get();
-        self.next_free_byte.set(self.next_free_byte.get() + mem::size_of::<T>());
-        println!("next free byte {} size {}", self.next_free_byte.get(), self.size);
+        println!("DMA next free byte {} size {}", self.next_free_byte.get() + mem::size_of::<T>(), self.size);
         if self.next_free_byte.get() < self.size {
+            let addr_virt = self.start + self.next_free_byte.get();
+            let addr_phys = self.start_phys + self.next_free_byte.get();
+            self.next_free_byte.set(self.next_free_byte.get() + mem::size_of::<T>());
             Ok(Dma::new(addr_virt, addr_phys, value))
         } else {
             Err(syscall::Error::new(syscall::error::ENOMEM))
@@ -41,11 +41,11 @@ impl DmaAllocator {
     }
 
     pub fn allocate_zeroed<'a, T>(&'a self) -> Result<Dma<'a, T>> {
-        let addr_virt = self.start + self.next_free_byte.get();
-        let addr_phys = self.start_phys + self.next_free_byte.get();
-        self.next_free_byte.set(self.next_free_byte.get() + mem::size_of::<T>());
-        println!("next free byte {} size {}", self.next_free_byte.get(), self.size);
+        println!("DMA next free byte {} size {}", self.next_free_byte.get() + mem::size_of::<T>(), self.size);
         if self.next_free_byte.get() < self.size {
+            let addr_virt = self.start + self.next_free_byte.get();
+            let addr_phys = self.start_phys + self.next_free_byte.get();
+            self.next_free_byte.set(self.next_free_byte.get() + mem::size_of::<T>());
             Ok(Dma::zeroed(addr_virt, addr_phys))
         } else {
             Err(syscall::Error::new(syscall::error::ENOMEM))

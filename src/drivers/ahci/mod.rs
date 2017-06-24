@@ -14,7 +14,7 @@ mod hba;
 pub fn init(pci_func: PciFunc, pci_header: PciHeader) {
     println!("Starting AHCI driver");
 
-    let dma_alloc = DmaAllocator::new(128000000);
+    let dma_alloc = DmaAllocator::new(33691392);
     let bar = match pci_header.bar(5) {
         PciBar::Memory(bar) => bar as usize,
         _ => {
@@ -28,9 +28,8 @@ pub fn init(pci_func: PciFunc, pci_header: PciHeader) {
     let mut buf = [0u8; 512];
 
     disks[0].read(0, &mut buf);
-
-    let msg = buf.iter().cloned().take_while(|c| *c != 0).collect();
-    println!("{:?}", String::from_utf8(msg));
+    let mut msg = String::from_utf8(buf.iter().cloned().take_while(|c| *c != 0).collect()).unwrap();
+    println!("{:?}", msg);
 }
 
 pub fn disks<'a>(dma_alloc: &'a DmaAllocator, base: usize) -> Vec<Disk<'a>> {
