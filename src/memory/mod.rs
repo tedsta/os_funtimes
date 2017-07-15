@@ -3,12 +3,15 @@ use spin;
 
 use self::area_frame_allocator::AreaFrameAllocator;
 use self::page_allocator::PageAllocator;
+use self::paging::{InactivePageTable, Mapper, Page, TemporaryPage};
 use self::stack_allocator::StackAllocator;
 
+pub use self::layout::*;
 pub use self::paging::{PhysicalAddress, VirtualAddress, EntryFlags, WRITABLE};
 pub use self::stack_allocator::Stack;
 
 mod area_frame_allocator;
+mod layout;
 mod page_allocator;
 mod paging;
 mod stack_allocator;
@@ -90,6 +93,22 @@ pub struct MemoryController {
 }
 
 impl MemoryController {
+    pub fn new_page_table(&mut self) -> Option<InactivePageTable> {
+        let mut tmp_page = TemporaryPage::new(Page::containing_address(KERNEL_TMP_PAGE_OFFSET));
+
+        self.frame_allocator.allocate_frame().map(|new_table_frame| {
+            InactivePageTable::new(new_table_frame, &mut self.active_table,
+                                   &mut tmp_page, &mut self.frame_allocator)
+        })
+    }
+
+    pub fn with_inactive_table<F>(&mut self, table: &mut InactivePageTable, f: F)
+        where F: FnOnce(&mut Mapper, &mut AreaFrameAllocator)
+    {
+        let mut tmp_page = TemporaryPage::new(Page::containing_address(KERNEL_TMP_PAGE_OFFSET));
+        self.active_table.with(table, &mut tmp_page, &mut self.frame_allocator, f);
+    }
+
     pub fn translate_address(&mut self, address: VirtualAddress) -> Option<PhysicalAddress> {
         self.active_table.translate(address)
     }

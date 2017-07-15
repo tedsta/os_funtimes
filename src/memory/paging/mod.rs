@@ -3,10 +3,10 @@ use core::ops::{Add, Deref, DerefMut, Sub};
 use multiboot2::BootInformation;
 
 use super::{PAGE_SIZE, Frame, FrameAllocator};
-use self::temporary_page::TemporaryPage;
 
-pub use self::mapper::Mapper;
 pub use self::entry::{EntryFlags, PRESENT, WRITABLE};
+pub use self::mapper::Mapper;
+pub use self::temporary_page::TemporaryPage;
 
 mod entry;
 mod mapper;
@@ -137,11 +137,11 @@ impl ActivePageTable {
     }
 
     pub fn with<A, F>(&mut self,
-                   table: &mut InactivePageTable,
-                   temporary_page: &mut temporary_page::TemporaryPage,
-                   allocator: &mut A,
-                   f: F)
-        where A: FrameAllocator, F: FnOnce(&mut Mapper, &mut A)
+                      table: &mut InactivePageTable,
+                      temporary_page: &mut temporary_page::TemporaryPage,
+                      allocator: &mut A,
+                      f: F)
+        where A: FrameAllocator+, F: FnOnce(&mut Mapper, &mut A)
     {
         use x86_64::instructions::tlb;
         use x86_64::registers::control_regs;
