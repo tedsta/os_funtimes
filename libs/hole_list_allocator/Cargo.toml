@@ -5,7 +5,8 @@ authors = ["Theodore DeRego <tderego94@gmail.com>"]
 
 [dependencies]
 spin = "0.4.5"
-linked_list_allocator = "0.2.0"
+#linked_list_allocator = "0.2.0"
+linked_list_allocator = { git = "https://github.com/phil-opp/linked-list-allocator.git"}
 
 [dependencies.lazy_static]
 version = "0.2.1"

@@ -6,7 +6,7 @@ use spin::Mutex;
 pub static WRITER: Mutex<Writer> = Mutex::new(Writer {
     column_position: 0,
     color_code: ColorCode::new(Color::White, Color::Black),
-    buffer: unsafe { Unique::new(0xb8000 as *mut _) },
+    buffer: unsafe { Unique::new_unchecked(0xb8000 as *mut _) },
 });
 
 #[allow(dead_code)]
@@ -99,7 +99,7 @@ impl Writer {
     }
 
     fn buffer(&mut self) -> &mut Buffer {
-        unsafe{ self.buffer.get_mut() }
+        unsafe{ self.buffer.as_mut() }
     }
 }
 
@@ -124,7 +124,7 @@ pub unsafe fn print_error(fmt: fmt::Arguments) {
     let mut writer = Writer {
         column_position: 0,
         color_code: ColorCode::new(Color::Red, Color::Black),
-        buffer: Unique::new(0xb8000 as *mut _),
+        buffer: Unique::new_unchecked(0xb8000 as *mut _),
     };
     writer.new_line();
     writer.write_fmt(fmt);

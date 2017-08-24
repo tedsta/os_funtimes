@@ -6,7 +6,10 @@
   "target-pointer-width": "64",
   "arch": "x86_64",
   "os": "none",
+  "pre-link-args": ["-m64", "-nostdlib", "-static"],
   "features": "-mmx,-sse,+soft-float",
+  "relocation-model": "pic",
   "disable-redzone": true,
+  "position-independent-executables": false,
   "panic": "abort"
 }

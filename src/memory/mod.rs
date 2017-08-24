@@ -57,13 +57,18 @@ pub fn init(boot_info: &BootInformation) {
 
     // Memory map the kernel heap
     use self::paging::Page;
-    use hole_list_allocator::{HEAP_START, HEAP_SIZE};
+    use hole_list_allocator::{self, HEAP_START, HEAP_SIZE};
 
     let heap_start_page = Page::containing_address(HEAP_START);
     let heap_end_page = Page::containing_address(HEAP_START + HEAP_SIZE-1);
 
     for page in Page::range_inclusive(heap_start_page, heap_end_page) {
         active_table.map(page, paging::WRITABLE, &mut frame_allocator);
+    }
+
+    // Initialize the heap
+    unsafe {
+        hole_list_allocator::init(HEAP_START, HEAP_SIZE);
     }
 
     // Create a stack allocator
@@ -86,7 +91,7 @@ pub fn init(boot_info: &BootInformation) {
 }
 
 pub struct MemoryController {
-    active_table: paging::ActivePageTable,
+    pub active_table: paging::ActivePageTable,
     frame_allocator: AreaFrameAllocator,
     stack_allocator: StackAllocator,
     page_allocator: PageAllocator,

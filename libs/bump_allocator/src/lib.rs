@@ -1,7 +1,5 @@
 #![feature(const_fn)]
-#![feature(allocator)]
 
-#![allocator]
 #![no_std]
 
 use spin::Mutex;
